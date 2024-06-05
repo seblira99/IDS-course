@@ -1,1 +1,1 @@
-# IDS-course
+# Interactive Digitale Systems
