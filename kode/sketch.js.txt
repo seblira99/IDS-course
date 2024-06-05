@@ -1,0 +1,160 @@
+// Variables for the face tracking model and video input
+let tracker;
+let video;
+let isModelReady = false;
+
+// Variables for the pong game
+let paddleHeight = 100;
+let paddleWidth = 20;
+let paddleSpeed = 5;
+let leftPaddle;
+let rightPaddle;
+
+// Variables for the ball
+let ball;
+let ballRadius = 12;
+let ballSpeed = 5;
+
+function setup() {
+  // Create the canvas and video elements
+  const canvas = createCanvas(640, 480);
+  canvas.parent("sketch");
+
+  video = createCapture(VIDEO);
+  video.size(width, height);
+  video.hide();
+
+  // Start the face tracking model
+  tracker = new clm.tracker();
+  tracker.init();
+  tracker.start(video.elt);
+  isModelReady = true;
+
+  // Create the left and right paddles
+  leftPaddle = new Paddle(0, height / 2, paddleWidth, paddleHeight);
+  rightPaddle = new Paddle(
+    width - paddleWidth,
+    height / 2,
+    paddleWidth,
+    paddleHeight
+  );
+
+  // Create the ball
+  ball = new Ball(width / 2, height / 2, ballRadius, ballSpeed);
+}
+
+function draw() {
+  background(220);
+
+  // Draw the video feed on the canvas
+  image(video, 0, 0, width, height);
+
+  // If the model is ready, detect faces in the video input
+  if (isModelReady) {
+    const positions = tracker.getCurrentPosition();
+    if (positions !== false) {
+      // Update the position of the player's paddle based on the face position
+      const face = positions[62];
+      if (face) {
+        const paddleY = map(
+          face[1],
+          0,
+          height,
+          paddleHeight / 2,
+          height - paddleHeight / 2
+        );
+        leftPaddle.pos.y = paddleY;
+      }
+    }
+  }
+
+  // Update and draw the paddles
+  leftPaddle.update();
+  leftPaddle.show();
+  rightPaddle.update();
+  rightPaddle.show();
+
+  // Update and draw the ball
+  ball.update();
+  ball.show();
+
+  // Check for collisions between the ball and the paddles
+  ball.checkPaddleCollision(leftPaddle);
+  ball.checkPaddleCollision(rightPaddle);
+}
+
+// Paddle class
+class Paddle {
+  constructor(x, y, width, height) {
+    this.pos = createVector(x, y);
+    this.width = width;
+    this.height = height;
+  }
+
+  update() {
+    this.pos.y = constrain(
+      this.pos.y,
+      this.height / 2,
+      height - this.height / 2
+    );
+  }
+
+  show() {
+    fill(0);
+    rect(
+      this.pos.x - this.width / 2,
+      this.pos.y - this.height / 2,
+      this.width,
+      this.height
+    );
+  }
+}
+
+// Ball class
+class Ball {
+  constructor(x, y, radius, speed) {
+    this.pos = createVector(x, y);
+    this.vel = p5.Vector.random2D();
+    this.vel.setMag(speed);
+    this.radius = radius;
+  }
+
+  update() {
+    this.pos.add(this.vel);
+    if (this.pos.y < this.radius || this.pos.y > height - this.radius) {
+      this.vel.y *= -1;
+    }
+
+    if (this.pos.x < 0 || this.pos.x > width) {
+      this.pos.x = width / 2;
+      this.pos.y = height / 2;
+      this.vel = p5.Vector.random2D();
+      this.vel.setMag(ballSpeed);
+    }
+  }
+
+  show() {
+    fill(0);
+    ellipse(this.pos.x, this.pos.y, this.radius * 2, this.radius * 2);
+  }
+
+  checkPaddleCollision(paddle) {
+    let halfPaddleWidth = paddle.width / 2;
+    let halfPaddleHeight = paddle.height / 2;
+    let halfBallDiameter = this.radius;
+    let top = paddle.pos.y - halfPaddleHeight;
+    let bottom = paddle.pos.y + halfPaddleHeight;
+    let left = paddle.pos.x - halfPaddleWidth;
+    let right = paddle.pos.x + halfPaddleWidth;
+    if (
+      this.pos.x + halfBallDiameter > left &&
+      this.pos.x - halfBallDiameter < right &&
+      this.pos.y + halfBallDiameter > top &&
+      this.pos.y - halfBallDiameter < bottom
+    ) {
+      this.vel.x *= -1;
+      this.vel.y += (this.pos.y - paddle.pos.y) * 0.1;
+      this.vel.setMag(ballSpeed);
+    }
+  }
+}
